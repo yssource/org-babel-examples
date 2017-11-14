@@ -4,7 +4,7 @@ from setuptools import setup
 
 setup(
     name = "orgbabelhelper",
-    version = "1.0.4",
+    version = "1.0.3",
     description = "python helper module for Emacs org mode babel",
     long_description = "python helper module for working with Emacs"
     + " org babel source blocks",
@@ -14,5 +14,10 @@ setup(
     url = "https://github.com/dfeich/org-babel-examples/tree/master/python",
     packages = ['orgbabelhelper'],
 
-    install_requires = ['pandas']
+    install_requires = ['pandas'],
+    classifiers = [
+	"Development Status :: 4 - Beta",
+	"Intended Audience :: Developers",
+	"Programming Language :: Python :: 3"
+    ]
 )
