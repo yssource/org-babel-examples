@@ -1,3 +1,11 @@
 **/*.out
 **/__pycache__/
 **/*egg-info/
+*.bbl
+*.synctex.gz
+*.aux
+*.out
+*.log
+*.tex
+*.pyg
+*/_minted-*
