@@ -129,7 +129,7 @@
 
      setup(
 	 name = "orgbabelhelper",
-	 version = "1.0.4",
+	 version = "1.0.5",
 	 description = "python helper module for Emacs org mode babel",
 	 long_description = "python helper module for working with Emacs"
 	 + " org babel source blocks",
@@ -485,106 +485,227 @@ return fname # return filename to org-mode
 [[file:python3-matplot-fig2.png]]
 
 * Pandas
-** Reading in a data frame from a table with the column names
+** orgtable_to_dataframe - reading in a data frame from a table with the column names
+*** src for orgtable_to_dataframe
+    #+NAME: src_orgtable_to_dataframe
+    #+BEGIN_SRC python :tangle orgbabelhelper/orgbabelhelper/orgbabelhelper.py :noweb yes
+      # NOTANGLE-START
+      import pandas as pd
 
-   #+NAME: src_orgtable_to_dataframe
-   #+BEGIN_SRC python :tangle orgbabelhelper/orgbabelhelper/orgbabelhelper.py :noweb yes
-     # NOTANGLE-START
-     import pandas as pd
+      <<src_orgdate_to_date>>
+      # NOTANGLE-END
 
-     <<src_orgdate_to_date>>
-     # NOTANGLE-END
+      def orgtable_to_dataframe(tbl, index=None, datecols=None,
+                                clean_adv=True, num_titlerows=1):
+          """Read an org table into a data frame.
 
-     def orgtable_to_dataframe(tbl, index=None, datecols=None):
-         """Read an org table into a data frame.
+          Parameters
+          ----------
+          tbl : org table passed in by src block header
+          index : name or index of column to use for index, optional
+          datecols : 'auto' or list of column names, optional. Try
+              to convert cells in these columns to python datetime objects.
+          clean_adv : if True, remove column with advanced org markup
+              (column containing !, ^, _, $,) and associated rows.
+          num_titlerows : number of title rows
 
-         Parameters
-         ----------
-         tbl : org table passed in by src block header
-         index : name or index of column to use for index, optional
-         datecols : 'auto' or list of column names, optional. Try
-             to convert cells in these columns to python datetime objects. 
+          Returns
+          -------
+          Pandas data frame
 
-         Returns
-         -------
-         Pandas data frame
+          Make sure you use ':colnames no' in your src block header. Else
+          the table's first row containing the column names will not be
+          available to the python code.
 
-         Make sure you use ':colnames no' in your src block header. Else
-         the table's first row containing the column names will not be
-         available to the python code.
+          """
+          df = pd.DataFrame(tbl)
 
-         """
-         df = pd.DataFrame(tbl)
-         df.columns = df.iloc[0,:]
-         df = df.iloc[1:,:]
-         df.columns.name = ""
+          if clean_adv:
+              s = df.iloc[:,0]
+              if '!' in s.values:
+                  df = df.drop(s[[x in ['^', '$', '_', '!'] for x in s]].index)
+                  df = df.iloc[:,1:]
 
-         if datecols is None:
-             datecols = []
-         elif datecols == "auto":
-             datecols = df.columns
+          if num_titlerows > 0:
+              for x in range(0,len(df.columns)):
+                  df.iloc[num_titlerows-1,x] = df.iloc[0:num_titlerows,x].str.cat(sep=' ')
+              df.columns = df.iloc[num_titlerows-1,:]
+              df = df.iloc[num_titlerows:,:]
+          df.columns.name = ""
 
-         for col in datecols:
-             try:
-                 df[col] = df[col].apply(orgdate_to_date)
-                 df[col] = pd.to_datetime(df[col])
-             except:
-                 pass
+          if datecols is None:
+              datecols = []
+          elif datecols == "auto":
+              datecols = df.columns
 
-         if index in df.columns:
-             df.set_index(index, inplace=True)
-         elif type(index) is int:
-             df.set_index(df.columns[index], inplace=True)
+          for col in datecols:
+              try:
+                  df[col] = df[col].apply(orgdate_to_date)
+                  df[col] = pd.to_datetime(df[col])
+              except:
+                  pass
 
-         return df
-   #+END_SRC
+          if index in df.columns:
+              df.set_index(index, inplace=True)
+          elif type(index) is int:
+              df.set_index(df.columns[index], inplace=True)
 
-   #+RESULTS:
-   : None
+          return df
+    #+END_SRC
 
-   We define a new test table:
+*** Tests of orgtable_to_dataframe
+**** Test with date columns
+     We define a new test table:
    
-   #+NAME: tableC
-   | Date             | End              | Name  |
-   |------------------+------------------+-------|
-   | [2016-08-10 Wed] | [2016-08-17 Wed] | Peter |
-   | [2016-08-11 Thu] | [2016-08-18 Thu] | Paul  |
-   | [2016-08-12 Fri] | [2016-08-19 Fri] | Mary  |
+     #+NAME: tableC
+     | Date             | End              | Name  |
+     |------------------+------------------+-------|
+     | [2016-08-10 Wed] | [2016-08-17 Wed] | Peter |
+     | [2016-08-11 Thu] | [2016-08-18 Thu] | Paul  |
+     | [2016-08-12 Fri] | [2016-08-19 Fri] | Mary  |
    
-   #+BEGIN_SRC python :results output :var tbl=tableC :colnames no :noweb yes
-     <<src_orgtable_to_dataframe>>
+     #+BEGIN_SRC python :results output :var tbl=tableC :colnames no :noweb yes
+       <<src_orgtable_to_dataframe>>
 
-     print(orgtable_to_dataframe(tbl))
-     print()
-     print(orgtable_to_dataframe(tbl, index='Name', datecols='auto'))
-     print()
-     print(orgtable_to_dataframe(tbl,1, datecols=['End']))
+       print(orgtable_to_dataframe(tbl))
+       print()
+       print(orgtable_to_dataframe(tbl, index='Name', datecols='auto'))
+       print()
+       print(orgtable_to_dataframe(tbl,1, datecols=['End']))
 
-   #+END_SRC
+     #+END_SRC
 
-   #+RESULTS:
-   #+begin_example
-		  Date               End   Name
-   1  [2016-08-10 Wed]  [2016-08-17 Wed]  Peter
-   2  [2016-08-11 Thu]  [2016-08-18 Thu]   Paul
-   3  [2016-08-12 Fri]  [2016-08-19 Fri]   Mary
+     #+RESULTS:
+     #+begin_example
+		    Date               End   Name
+     1  [2016-08-10 Wed]  [2016-08-17 Wed]  Peter
+     2  [2016-08-11 Thu]  [2016-08-18 Thu]   Paul
+     3  [2016-08-12 Fri]  [2016-08-19 Fri]   Mary
 
-	       Date        End
-   Name                       
-   Peter 2016-08-10 2016-08-17
-   Paul  2016-08-11 2016-08-18
-   Mary  2016-08-12 2016-08-19
+		 Date        End
+     Name                       
+     Peter 2016-08-10 2016-08-17
+     Paul  2016-08-11 2016-08-18
+     Mary  2016-08-12 2016-08-19
 
-			   Date   Name
-   End                                
-   2016-08-17  [2016-08-10 Wed]  Peter
-   2016-08-18  [2016-08-11 Thu]   Paul
-   2016-08-19  [2016-08-12 Fri]   Mary
-   #+end_example
+			     Date   Name
+     End                                
+     2016-08-17  [2016-08-10 Wed]  Peter
+     2016-08-18  [2016-08-11 Thu]   Paul
+     2016-08-19  [2016-08-12 Fri]   Mary
+     #+end_example
+
+**** Test with advanced org table features
+
+     - [ ] maybe allow to use org column names from !-row
+     - [X] option to delete !-column
+
+     #+NAME: tblExpExcelTest
+     |   | First Name | Group  | Usage flag | Value |
+     | ! | name       | group  |        use | value |
+     |---+------------+--------+------------+-------|
+     | $ | x=20       |        |            |       |
+     |   | john       | B      |          1 |     1 |
+     | ^ |            | jgroup |            |       |
+     |   | beth       | B      |          0 |     3 |
+     |   | mike       | C      |          1 |     5 |
+     |   | leslie     | A      |          0 |     7 |
+     | _ |            |        |      label |       |
+     |   | barbara    | A      |          1 |     4 |
+     |   | ken        | C      |          0 |     2 |
+     |   | thomas     | A      |          1 |     8 |
 
 
-** printing a data frame as a table
-*** using the orgbabelhelper functions
+
+     #+BEGIN_SRC python :results output :var tbl=tblExpExcelTest :colnames=no :noweb yes
+       import pandas as pd
+       import numpy as np
+
+       <<src_orgtable_to_dataframe>>
+
+       df = orgtable_to_dataframe(tbl,clean_adv=True)
+       print(df)
+     #+END_SRC
+
+     #+RESULTS:
+     :    First Name Group Usage flag Value
+     : 3        john     B          1     1
+     : 5        beth     B          0     3
+     : 6        mike     C          1     5
+     : 7      leslie     A          0     7
+     : 9     barbara     A          1     4
+     : 10        ken     C          0     2
+     : 11     thomas     A          1     8
+    
+**** Test for joining of multiple title rows
+
+     #+NAME: tblTwoTitleRowsA
+     | First |   Game |  costs |
+     | name  | tokens | in CHF |
+     |-------+--------+--------|
+     | Peter |      4 |     20 |
+     | Paul  |      6 |     30 |
+     | Mary  |      8 |     40 |
+     #+TBLFM: $3=$2 5
+
+
+     #+NAME: tblTwoTitleRowsB
+     |   | First    | Game   | costs   |
+     |   | name     | tokens | in CHF  |
+     | ! | name     | tokens | costs   |
+     |   | (string) | (int)  | (float) |
+     |---+----------+--------+---------|
+     |   | Peter    | 4      | 20.0    |
+     |   | Paul     | 6      | 30.0    |
+     |   | Mary     | 8      | 40.0    |
+     #+TBLFM: $4=$3 5
+     
+     #+BEGIN_SRC python :results output :var tblA=tblTwoTitleRowsA tblB=tblTwoTitleRowsB :colnames=no :noweb yes
+       import pandas as pd
+       import numpy as np
+
+       <<src_orgtable_to_dataframe>>
+
+       print("first table with 2 title rows:\n")
+       print(orgtable_to_dataframe(tblA, num_titlerows=2))
+       print("\nfirst table with 0 title rows:\n")
+       print(orgtable_to_dataframe(tblA, num_titlerows=0))
+       print("\nsecond table with 3 title rows:\n")
+       print(orgtable_to_dataframe(tblB, num_titlerows=3))
+
+     #+END_SRC
+
+     #+RESULTS:
+     #+begin_example
+     first table with 2 title rows:
+
+       First name Game tokens costs in CHF
+     2      Peter           4           20
+     3       Paul           6           30
+     4       Mary           8           40
+
+     first table with 0 title rows:
+
+	    0       1       2
+     0  First    Game   costs
+     1   name  tokens  in CHF
+     2  Peter       4      20
+     3   Paul       6      30
+     4   Mary       8      40
+
+     second table with 3 title rows:
+
+       First name (string)         ...          costs in CHF (float)
+     4               Peter         ...                            20
+     5                Paul         ...                            30
+     6                Mary         ...                            40
+
+     [3 rows x 3 columns]
+     #+end_example
+     
+     
+** dataframe_to_orgtable - printing a data frame as a table
+*** src for dataframe_to_orgtable
     I define a function in a named src block with name =dataframe_to_orgtable=.
     The following function will return a nicely formatted org table.
    
@@ -604,7 +725,7 @@ return fname # return filename to org-mode
           name : defines org table's name (#+NAME:), optional
           caption defines org table's caption (#+CAPTION:): , optional
           attr : defines org table's LaTeX attributes (#+ATTR_LATEX:), optional
-          index : write the row names, optional
+          index : if True, write the row names as the first column, optional
           date_format : Format string for datetime objects, optional
           hlines : list  of numbers. Where to put horizontal lines, optional
           encoding : Encoding for the resulting string, optional
@@ -645,6 +766,8 @@ return fname # return filename to org-mode
 
     #+END_SRC
 
+*** Tests for dataframe_to_orgtable
+    
     As before, I use the noweb syntax for including the previous 
     source block in the following test source block.
    
@@ -709,6 +832,8 @@ return fname # return filename to org-mode
 
     :END:
 
+
+** other methods for printing a data frame
 *** data frame printing using Ipython.display
    As an alternative, the display function from Ipython is also able
    to align a frame. I only managed to get =diplay_pretty= working
