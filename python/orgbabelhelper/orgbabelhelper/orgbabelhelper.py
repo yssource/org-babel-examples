@@ -20,7 +20,7 @@ def orgdate_to_date(datestr):
         return ''
 
     #m = re.match(r'^\[(\d+-\d+-\d+) +[a-zA-Z]{3}\]$', datestr)
-    m = re.match(r'^[\[<](\d+-\d+-\d+) +[a-zA-Z]{3}[\]>]$', datestr)
+    m = re.match(r'^[\[<](\d+-\d+-\d+) +[a-zA-Z]{2,3}[\]>]$', datestr)
     if not m:
         raise ValueError("Input String is not a date: >%s<" % datestr)
 
@@ -32,29 +32,8 @@ def date_to_orgdate(date, active=False):
         return "<%s>" % orgstr
     return "[%s]" % orgstr
 
-def orgdate_to_date(datestr):
-    """Returns a python datetime for the org date given in datestr.
-
-    Allows passing in an empty/whitespace string."""
-    if re.match(r'^ *$', datestr):
-        return ''
-
-    #m = re.match(r'^\[(\d+-\d+-\d+) +[a-zA-Z]{3}\]$', datestr)
-    m = re.match(r'^[\[<](\d+-\d+-\d+) +[a-zA-Z]{3}[\]>]$', datestr)
-    if not m:
-        raise ValueError("Input String is not a date: >%s<" % datestr)
-
-    return dt.datetime.strptime(m.group(1), '%Y-%m-%d').date()
-
-def date_to_orgdate(date, active=False):
-    orgstr = date.strftime("%Y-%m-%d %a")
-    if active:
-        return "<%s>" % orgstr
-    return "[%s]" % orgstr
-
-# NOTANGLE-END
-
-def orgtable_to_dataframe(tbl, index=None, datecols=None):
+def orgtable_to_dataframe(tbl, index=None, datecols=None,
+                          clean_adv=True, num_titlerows=1):
     """Read an org table into a data frame.
 
     Parameters
@@ -62,7 +41,10 @@ def orgtable_to_dataframe(tbl, index=None, datecols=None):
     tbl : org table passed in by src block header
     index : name or index of column to use for index, optional
     datecols : 'auto' or list of column names, optional. Try
-        to convert cells in these columns to python datetime objects. 
+        to convert cells in these columns to python datetime objects.
+    clean_adv : if True, remove column with advanced org markup
+        (column containing !, ^, _, $,) and associated rows.
+    num_titlerows : number of title rows
 
     Returns
     -------
@@ -74,8 +56,18 @@ def orgtable_to_dataframe(tbl, index=None, datecols=None):
 
     """
     df = pd.DataFrame(tbl)
-    df.columns = df.iloc[0,:]
-    df = df.iloc[1:,:]
+
+    if clean_adv:
+        s = df.iloc[:,0]
+        if '!' in s.values:
+            df = df.drop(s[[x in ['^', '$', '_', '!'] for x in s]].index)
+            df = df.iloc[:,1:]
+
+    if num_titlerows > 0:
+        for x in range(0,len(df.columns)):
+            df.iloc[num_titlerows-1,x] = df.iloc[0:num_titlerows,x].str.cat(sep=' ')
+        df.columns = df.iloc[num_titlerows-1,:]
+        df = df.iloc[num_titlerows:,:]
     df.columns.name = ""
 
     if datecols is None:
@@ -98,8 +90,8 @@ def orgtable_to_dataframe(tbl, index=None, datecols=None):
     return df
 
 def dataframe_to_orgtable(dframe, name=None, caption=None, attr=None,
-			  index=True, date_format=None, hlines=None,
-			  encoding='ascii'):
+		  index=True, date_format=None, hlines=None,
+		  encoding='ascii'):
     """
     Parameters
     ----------
@@ -107,7 +99,7 @@ def dataframe_to_orgtable(dframe, name=None, caption=None, attr=None,
     name : defines org table's name (#+NAME:), optional
     caption defines org table's caption (#+CAPTION:): , optional
     attr : defines org table's LaTeX attributes (#+ATTR_LATEX:), optional
-    index : write the row names, optional
+    index : if True, write the row names as the first column, optional
     date_format : Format string for datetime objects, optional
     hlines : list  of numbers. Where to put horizontal lines, optional
     encoding : Encoding for the resulting string, optional
